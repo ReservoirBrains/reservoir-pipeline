@@ -1,5 +1,6 @@
 # data directory
 data/
+hyperopt-search/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
