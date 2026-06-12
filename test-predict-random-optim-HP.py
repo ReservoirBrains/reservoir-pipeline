@@ -15,7 +15,10 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
 
 # TO EDIT THE CODE FOR YOUR NEEDS
-## load your data (input / outputs) in "ZONE TO EDIT
+## TODO: to load your data (input / outputs) go to the placeholder "ZONE TO EDIT"
+
+# Extra reservoir training parameters
+WARMUP = 20 # number of initial time steps ignored during reservoir training
 
 # Hyper-parameter (HP) search parameters
 ## If want to do shorter/longer hyper-parameter searches
@@ -25,19 +28,22 @@ from sklearn.preprocessing import MinMaxScaler
 ## - instances_per_trial: number of reservoir trained instances to average the results/loss over
 HYPER_SEARCH_CONFIG = {
     "exp": "brainhack",
-    "hp_max_evals": 100, #200+ for more robustness
+    "hp_max_evals": 150, #200+ for more robustness
     "hp_method": "random", #tpe for optimised but not parallelized
     "seed": 42,
     "instances_per_trial": 3, #5 for more robustness
     "hp_space": {
         "N": ["choice", 500],
-        "sr": ["loguniform", 1e-2, 1e1],
-        "lr": ["loguniform", 1e-3, 1],
-        "input_scaling": ["loguniform", 1e-1, 1e1], #"input_scaling": ["choice", 1.0],
+        "sr": ["loguniform", 1e-3, 3],
+        "lr": ["loguniform", 1e-4, 1],
+        "input_scaling": ["loguniform", 1e-3, 3], #"input_scaling": ["choice", 1.0],
         "ridge": ["loguniform", 1e-9, 1e3],
         "seed": ["choice", 1234],
+        "warmup": ["choice", WARMUP],
     }
 }
+
+
 
 # Parellization of subject processing?
 ## /!\ Parellalisation means more RAM usage
@@ -45,8 +51,13 @@ HYPER_SEARCH_CONFIG = {
 RESERVOIR_WORKERS = 1 # NO Parallization
 #RESERVOIR_WORKERS = -1 # "-1" means all CPU cores are used
 
-# Extra reservoir parameters
-WARMUP = 20 # number of time steps that we remove from the beggining of earch training sample
+
+#---
+#---
+#---
+
+
+
 # Hyperopt output folder
 HYPEROPT_SEARCH_DIR = Path("hyperopt-search")
 # Plot parameters
@@ -64,13 +75,13 @@ warnings.filterwarnings(
     module="sklearn.base",
 )
 
-def train_and_evaluate(params, dataset):
+def train_and_evaluate(params, dataset, warmup):
     esn = build_esn(**params)
 
     esn.fit(
         dataset["X_train_scaled"],
         dataset["Y_train_scaled"],
-        warmup=dataset["warmup"],
+        warmup=int(warmup),
         workers=dataset["workers"],
     )
 
@@ -291,7 +302,7 @@ def compute_metrics(Y_true_flat, Y_pred, Y_baseline_flat=None):
 # Define the objective function.
 # ReservoirPy hyperopt objectives must take dataset and config first, then
 # searched parameters as keyword-only arguments, and return a dict with "loss".
-def objective(dataset, config, *, input_scaling, N, sr, lr, ridge, seed):
+def objective(dataset, config, *, input_scaling, N, sr, lr, ridge, seed, warmup):
     instances = config["instances_per_trial"]
     variable_seed = int(seed)
 
@@ -309,7 +320,7 @@ def objective(dataset, config, *, input_scaling, N, sr, lr, ridge, seed):
             "seed": variable_seed,
         }
 
-        metrics = train_and_evaluate(params, dataset)
+        metrics = train_and_evaluate(params, dataset, warmup)
         rmses.append(metrics["rmse"])
         maes.append(metrics["mae"])
         r2s.append(metrics["r2"])
@@ -394,7 +405,6 @@ def main():
         "X_test_scaled": X_test_scaled,
         "Y_true_flat": Y_true_flat,
         "scaler": scaler,
-        "warmup": WARMUP,
         "workers": RESERVOIR_WORKERS,
     }
 
@@ -430,6 +440,7 @@ def main():
         "input_scaling": float(best_params["input_scaling"]),
         "ridge": float(best_params["ridge"]),
         "seed": int(best_params["seed"]),
+        "warmup": int(best_params["warmup"]),
     }
 
     print()
@@ -443,8 +454,17 @@ def main():
     print()
 
     alphas = np.logspace(-9, 3, 13)
+    final_warmup = best_params["warmup"]
+    final_esn_params = {
+        "N": best_params["N"],
+        "sr": best_params["sr"],
+        "lr": best_params["lr"],
+        "input_scaling": best_params["input_scaling"],
+        "ridge": best_params["ridge"],
+        "seed": best_params["seed"],
+    }
     final_esn, final_readout = build_final_esn_with_ridgecv(
-        **best_params,
+        **final_esn_params,
         alphas=alphas,
     )
     print(
@@ -456,7 +476,7 @@ def main():
     final_esn.fit(
         X_train_scaled,
         Y_train_scaled,
-        warmup=WARMUP,
+        warmup=final_warmup,
         workers=RESERVOIR_WORKERS,
     )
     final_predictions = predict_test_series(final_esn, X_test_scaled, scaler)
@@ -498,7 +518,7 @@ def main():
             flat_experiment_dir = build_flat_hyperopt_report_dir(experiment_dir, Path(plot_dir))
             fig = plot_hyperopt_report(
                 flat_experiment_dir,
-                ("lr", "sr", "ridge"),
+                ("lr", "sr", "input_scaling", "ridge"),
                 metric="r2",
                 loss_metric="loss",
                 loss_behaviour="min",
