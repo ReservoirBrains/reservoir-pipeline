@@ -21,4 +21,4 @@ You can directly use the following for automatic optimization and training of yo
     Read the instruction at the beginning of the file,
     and insert your dataset and training scheme in the "main()" method.
 - python notebook: "notebooks/tutorial_hyperopt_reservoirpy_esn.ipynb"
-    Follow the instrution in the notebook.
+    Follow the instruction in the notebook.
