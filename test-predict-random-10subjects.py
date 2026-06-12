@@ -22,7 +22,7 @@ rpy.set_seed(42)
 
 # Create 10 random time series with shape (4000, 200).
 print("Predicting random data for demo purpose for 10 individuals with 200 voxels on 4,000 time points ...\n")
-# NB: Timeseries of differents subjects don't have to be of same length
+# NB: Timeseries of differents subjects don't have to be of same length 
 series_list = [
     np.random.randn(4000, 200).astype(np.float32)
     for _ in range(10)
