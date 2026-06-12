@@ -28,12 +28,12 @@ WARMUP = 20 # number of initial time steps ignored during reservoir training
 ## - instances_per_trial: number of reservoir trained instances to average the results/loss over
 HYPER_SEARCH_CONFIG = {
     "exp": "brainhack",
-    "hp_max_evals": 150, #200+ for more robustness
-    "hp_method": "random", #tpe for optimised but not parallelized
+    "hp_max_evals": 150, # -> use 200+ for more broader parameter exploration
+    "hp_method": "random", # -> use "tpe" for bayesian optimization but without parellelization
     "seed": 42,
-    "instances_per_trial": 3, #5 for more robustness
+    "instances_per_trial": 3, # -> use 5 for more robustness
     "hp_space": {
-        "N": ["choice", 500],
+        "N": ["choice", 500], # -> use 1000 or 2000 for more computational power
         "sr": ["loguniform", 1e-3, 3],
         "lr": ["loguniform", 1e-4, 1],
         "input_scaling": ["loguniform", 1e-3, 3], #"input_scaling": ["choice", 1.0],
