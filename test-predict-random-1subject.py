@@ -21,13 +21,15 @@ rpy.set_seed(42)
 
 
 # Create 10 random time series with shape (4000, 200).
-print("Predicting random data for demo purpose for 1 individual with 200 voxels on 4,000 time points ...\n")
+print("Predicting random data for demo purpose for 10 individuals with 200 voxels on 4,000 time points ...\n")
+# NB: Timeseries of differents subjects don't have to be of same length
 series_list = [
     np.random.randn(4000, 200).astype(np.float32)
     for _ in range(10)
 ]
 
 # Split train/test by full time series.
+print("Splitting subjects 8 for training and 2 for testing")
 train_series = series_list[:8]
 test_series = series_list[8:]
 
