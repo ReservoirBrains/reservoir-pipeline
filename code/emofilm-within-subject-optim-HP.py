@@ -453,7 +453,7 @@ def main():
     Y = [Y[0]]
 
     # identify TR corresponding to 70% of the movie duration
-    split_index = int(0.7 * len(X))
+    split_index = int(0.7 * X[0].shape[0])
 
     X_train = [s[:split_index] for s in X]
     Y_train = [s[:split_index] for s in Y]
