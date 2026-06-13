@@ -2,6 +2,12 @@
 data/
 hyperopt-search/
 
+# created result files and images
+*.pdf 
+*.png 
+*.jpg
+*.jpeg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
