@@ -1,6 +1,7 @@
 # data directory
 data/
 hyperopt-search/
+notebooks/hyperopt-search/
 
 # created result files and images
 *.pdf 
