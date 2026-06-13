@@ -15,6 +15,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
 
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, Path("code").resolve().as_posix())
@@ -353,6 +354,8 @@ def objective(dataset, config, *, input_scaling, N, sr, lr, ridge, seed, warmup)
 # ---------------
 
 def main():
+    import matplotlib.pyplot as plt
+
     # Reproducibility.
     np.random.seed(42)
     rpy.set_seed(42)
@@ -402,14 +405,20 @@ def main():
     y_true_single = movie_behavior[1:]
     y_baseline_single = movie_behavior[:-1]
 
+    # Slice fMRI data to the movie window, based on event timing files.
     x_sliced = [
         slice_fmri_to_movie_window(series, timing_file, tr=1.9)
         for series, timing_file in zip(X, event_timing_files)
     ]
+    # y aligned to the fMRI TRs, with a lag of 5 seconds to account for the hemodynamic response delay
     y_aligned = [
         align_behavior_to_fmri_trs(movie_behavior, timing_file, series.shape[0], lag_seconds=lag_seconds)
         for series, timing_file in zip(x_sliced, event_timing_files)
     ]
+
+
+    plt.plot(y_aligned[0])
+    plt.show()
     # x_aligned = [
     #     align_fmri_to_movie_window(series, timing_file, movie_target_length, lag_seconds=lag_seconds)
     #     for series, timing_file in zip(X, event_timing_files)
@@ -468,7 +477,7 @@ def main():
 
     # Apply feature-wise MinMax normalization between -1 and 1.
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    scaler.fit(np.vstack(train_series))
+    scaler.fit(np.vstack(X_train))
 
     X_train_scaled = [scaler.transform(x) for x in X_train]
     Y_train_scaled = [scaler.transform(y) for y in Y_train]
