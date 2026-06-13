@@ -67,8 +67,8 @@ def align_behavior_to_fmri_trs(y_series, event_timing_path, target_length, lag_s
         y_series = y_series[:, None]
 
     behavior_time = np.linspace(
-        movie_onset + lag_seconds,
-        movie_onset + movie_duration + lag_seconds,
+        movie_onset,
+        movie_onset + movie_duration,
         num=len(y_series),
         endpoint=False,
     )
