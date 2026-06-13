@@ -14,3 +14,11 @@ conda create -n rpy-brainhack python=3.13 pip
 conda activate rpy-brainhack
 pip install -r requirements.txt
 ```
+
+## Ready-to-use reservoir code
+You can directly use the following for automatic optimization and training of your task:
+- python script: "test-predict-random-optim-HP.py"
+    Read the instruction at the beginning of the file,
+    and insert your dataset and training scheme in the "main()" method.
+- python notebook: "notebooks/tutorial_hyperopt_reservoirpy_esn.ipynb"
+    Follow the instruction in the notebook.
