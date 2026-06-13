@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
 
 def compute_metrics(helpers, y_true_flat, y_pred, y_baseline_flat=None):
     metrics = dict(helpers.compute_metrics(y_true_flat, y_pred, y_baseline_flat))
@@ -33,6 +34,14 @@ def load_movie_timing(event_timing_path):
     return movie_onset, movie_duration, run_end
 
 
+def slice_fmri_to_movie_window(x_series, event_timing_path, tr):
+    movie_onset, movie_duration, _ = load_movie_timing(event_timing_path)
+    start_index = int(round(movie_onset / tr))
+    slice_length = int(round(movie_duration / tr))
+    end_index = start_index + slice_length
+    return x_series[start_index:end_index]
+
+
 def align_fmri_to_movie_window(x_series, event_timing_path, target_length, lag_seconds=5.0):
     movie_onset, movie_duration, run_end = load_movie_timing(event_timing_path)
     x_time = np.linspace(0.0, run_end, num=len(x_series), endpoint=True)
@@ -46,6 +55,37 @@ def align_fmri_to_movie_window(x_series, event_timing_path, target_length, lag_s
     aligned = np.empty((target_length, x_series.shape[1]), dtype=float)
     for feature_index in range(x_series.shape[1]):
         aligned[:, feature_index] = np.interp(aligned_times, x_time, x_series[:, feature_index])
+    return aligned
+
+
+def align_behavior_to_fmri_trs(y_series, event_timing_path, target_length, lag_seconds=5.0):
+    movie_onset, movie_duration, _ = load_movie_timing(event_timing_path)
+
+    y_series = np.asarray(y_series)
+    was_1d = y_series.ndim == 1
+    if was_1d:
+        y_series = y_series[:, None]
+
+    behavior_time = np.linspace(
+        movie_onset + lag_seconds,
+        movie_onset + movie_duration + lag_seconds,
+        num=len(y_series),
+        endpoint=False,
+    )
+
+    fmri_times = np.linspace(
+        movie_onset + lag_seconds,
+        movie_onset + movie_duration + lag_seconds,
+        num=target_length,
+        endpoint=False,
+    )
+
+    aligned = np.empty((target_length, y_series.shape[1]), dtype=float)
+    for feature_index in range(y_series.shape[1]):
+        aligned[:, feature_index] = np.interp(fmri_times, behavior_time, y_series[:, feature_index])
+
+    if was_1d:
+        return aligned[:, 0]
     return aligned
 
 

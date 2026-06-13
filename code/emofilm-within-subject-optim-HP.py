@@ -16,6 +16,10 @@ from sklearn.preprocessing import MinMaxScaler
 
 import pandas as pd
 
+import sys
+sys.path.insert(0, Path("code").resolve().as_posix())
+from utils import align_behavior_to_fmri_trs, align_fmri_to_movie_window, slice_fmri_to_movie_window
+
 # TO EDIT THE CODE FOR YOUR NEEDS
 ## TODO: to load your data (input / outputs) go to the placeholder "ZONE TO EDIT"
 
@@ -347,32 +351,6 @@ def objective(dataset, config, *, input_scaling, N, sr, lr, ridge, seed, warmup)
 # ---------------
 # ---------------
 # ---------------
-def load_movie_timing(event_timing_path):
-    event_table = pd.read_csv(event_timing_path)
-    movie_rows = event_table.loc[event_table["trial_type"].eq("film")]
-    if movie_rows.empty:
-        raise ValueError(f"No film row found in {event_timing_path}")
-    movie_row = movie_rows.iloc[0]
-    movie_onset = float(movie_row["onset"])
-    movie_duration = float(movie_row["duration"])
-    run_end = float((event_table["onset"] + event_table["duration"]).max())
-    return movie_onset, movie_duration, run_end
-
-
-def align_fmri_to_movie_window(x_series, event_timing_path, target_length, lag_seconds=5.0):
-    movie_onset, movie_duration, run_end = load_movie_timing(event_timing_path)
-    x_time = np.linspace(0.0, run_end, num=len(x_series), endpoint=True)
-    aligned_times = np.linspace(
-        movie_onset + lag_seconds,
-        movie_onset + movie_duration + lag_seconds,
-        num=target_length,
-        endpoint=False,
-    )
-
-    aligned = np.empty((target_length, x_series.shape[1]), dtype=float)
-    for feature_index in range(x_series.shape[1]):
-        aligned[:, feature_index] = np.interp(aligned_times, x_time, x_series[:, feature_index])
-    return aligned
 
 def main():
     # Reproducibility.
@@ -407,16 +385,47 @@ def main():
         raise ValueError(
             f"Timeseries count ({len(X)}) does not match event timing files ({len(event_timing_files)})."
         )
+    timing_file = event_timing_files[0]
 
     lag_seconds = 5.0
 
+    movie_behavior = (
+        behav_data[target_column]
+        .astype(float)
+        .interpolate(limit_direction="both")
+        .bfill()
+        .ffill()
+        .to_numpy()
+    )
+
+    movie_target_length = len(movie_behavior)
+    y_true_single = movie_behavior[1:]
+    y_baseline_single = movie_behavior[:-1]
+
+    x_sliced = [
+        slice_fmri_to_movie_window(series, timing_file, tr=1.9)
+        for series, timing_file in zip(X, event_timing_files)
+    ]
+    y_aligned = [
+        align_behavior_to_fmri_trs(movie_behavior, timing_file, series.shape[0], lag_seconds=lag_seconds)
+        for series, timing_file in zip(x_sliced, event_timing_files)
+    ]
+    # x_aligned = [
+    #     align_fmri_to_movie_window(series, timing_file, movie_target_length, lag_seconds=lag_seconds)
+    #     for series, timing_file in zip(X, event_timing_files)
+    # ]
+    X = x_sliced
+    Y = y_aligned
+    
+
+
     
     print(len(X)) #23
+    print(Y[0].shape)
     print(X[0].shape) #(534, 200)
     print(X[1].shape) #(555, 200)
-    print(X[2].shape) #(537, 200)
-    print(behav_data.shape) #(496, 50)
-    input()
+    print(y_aligned[1].shape) #(537, 200)
+    # print(behav_data.shape) #(496, 50)
 
 
 
@@ -438,11 +447,24 @@ def main():
 
     # Create one-step-ahead pairs: x[t] -> x[t+1].
     ## X training_data
-    X_train = [s[:-1] for s in train_series]
-    Y_train = [s[1:] for s in train_series]
 
-    X_test = [s[:-1] for s in test_series]
-    Y_test = [s[1:] for s in test_series]
+    # sample one subject for now
+    X = [X[0]]
+    Y = [Y[0]]
+
+    # identify TR corresponding to 70% of the movie duration
+    split_index = int(0.7 * len(X))
+
+    X_train = [s[:split_index] for s in X]
+    Y_train = [s[:split_index] for s in Y]
+
+    X_test = [s[split_index:] for s in X]
+    Y_test = [s[split_index:] for s in Y]
+
+    print(f"Training data: {len(X_train)} series, each with shape {X_train[0].shape}")
+    print(f"Testing data: {len(X_test)} series, each with shape {X_test[0].shape}")
+    print(f"Training target: {len(Y_train)} series, each with shape {Y_train[0].shape}")
+    print(f"Testing target: {len(Y_test)} series, each with shape {Y_test[0].shape}")
 
     # Apply feature-wise MinMax normalization between -1 and 1.
     scaler = MinMaxScaler(feature_range=(-1, 1))
